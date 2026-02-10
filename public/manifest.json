@@ -1,0 +1,6 @@
+{
+ "name":"Leave App",
+ "short_name":"Leave",
+ "start_url":"/",
+ "display":"standalone"
+}

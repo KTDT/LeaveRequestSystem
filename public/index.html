@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leave Request System</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; background: #f4f4f4; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input, textarea, button, select { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        .hidden { display: none !important; }
+        
+        .leave-row { padding: 15px; border-radius: 8px; margin-bottom: 12px; color: white; font-weight: bold; position: relative; }
+        .annual   { background: #007bff; }
+        .sick     { background: #28a745; }
+        .personal { background: #FFFF00; color: #000 !important; border: 1px solid #e6e600; }
+        .personal textarea, .personal input { color: #000 !important; border: 1px solid #ccc; }
+        .comp     { background: #6f42c1; }
+        .other    { background: #ff8800; }
+        
+        .row-flex { display: flex; gap: 10px; margin-top: 8px; }
+        textarea { resize: none; overflow: hidden; min-height: 45px; }
+        
+        canvas { border: 2px solid #333; background: #fff; display: block; margin: 10px 0; width: 100%; max-width: 400px; height: 150px; touch-action: none; border-radius: 5px; }
+        button { cursor: pointer; background: #28a745; color: white; border: none; font-weight: bold; font-size: 1.1em; transition: 0.3s; }
+        button:hover { opacity: 0.8; }
+        .btn-clear { background: #6c757d; margin-top: 0; }
+        #pin { letter-spacing: 8px; text-align: center; font-size: 1.3em; font-weight: bold; }
+
+        /* Fix for the medical note container to prevent color bleeding */
+        #medicalNoteContainer { background: white !important; color: #333 !important; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="loginScreen">
+        <h2 style="text-align: center;">Leave Request Login</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">LOGIN</button>
+    </div>
+
+    <div id="formScreen" class="hidden">
+        <h2 style="margin-top:0;">Leave Request Form</h2>
+        <input type="text" id="employeeName" placeholder="Full Employee Name">
+        <input type="text" id="pin" placeholder="PIN" inputmode="numeric" maxlength="4">
+        
+        <label style="font-weight:bold; font-size: 0.9em;">Route to Shift Supervisor:</label>
+        <select id="shiftSelect" onchange="updateButtonColor()">
+            <option value="dayshift">Day Shift</option>
+            <option value="evenings">Evening Shift</option>
+            <option value="midnights">Midnight Shift</option>
+        </select>
+
+        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px;">Leave Types</h3>
+        
+        <div class="leave-row annual">Annual Leave
+            <div class="row-flex"><input id="annHid" class="hidden"><textarea id="annualDates" placeholder="Dates"></textarea><input id="annualHours" type="number" placeholder="Hrs" style="width:85px"></div>
+        </div>
+
+        <div class="leave-row sick">Sick Leave
+            <div class="row-flex">
+                <input id="sicHid" class="hidden">
+                <textarea id="sickDates" placeholder="Dates"></textarea>
+                <input id="sickHours" type="number" placeholder="Hrs" style="width:85px" oninput="toggleMedicalNote()">
+            </div>
+            <div id="medicalNoteContainer" class="hidden" style="margin-top: 10px; padding: 10px; border-radius: 5px;">
+                <label style="font-size: 0.8em; display: block; margin-bottom: 5px; font-weight: bold;">Attach Sick Note (Photo, PDF, or Text)</label>
+                <input type="file" id="sickNote" accept="image/*,.pdf,.txt" capture="environment" style="margin: 0; padding: 5px; font-size: 0.8em; background: white; color: black;">
+            </div>
+        </div>
+
+        <div class="leave-row personal">Personal Leave
+            <div class="row-flex"><input id="perHid" class="hidden"><textarea id="personalDates" placeholder="Dates"></textarea><input id="personalHours" type="number" placeholder="Hrs" style="width:85px"></div>
+        </div>
+        <div class="leave-row comp">Compensatory
+            <div class="row-flex"><input id="comHid" class="hidden"><textarea id="compDates" placeholder="Dates"></textarea><input id="compHours" type="number" placeholder="Hrs" style="width:85px"></div>
+        </div>
+        <div class="leave-row other">Other
+            <div class="row-flex"><input id="othHid" class="hidden"><textarea id="otherDates" placeholder="Dates"></textarea><input id="otherHours" type="number" placeholder="Hrs" style="width:85px"></div>
+        </div>
+
+        <textarea id="remarks" placeholder="Remarks (e.g., Holiday, Military, Jury Duty)"></textarea>
+
+        <h3>Digital Signature</h3>
+        <canvas id="sig"></canvas>
+        <button type="button" class="btn-clear" onclick="pad.clear()">Clear Signature</button>
+        <button id="submitBtn" onclick="submitForm()">Submit Request</button>
+    </div>
+</div>
+
+<div id="successModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 2000;">
+    <div style="background: white; padding: 30px; border-radius: 15px; max-width: 450px; width: 90%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <h2 style="margin-top: 0; color: #333;">Review Your Request</h2>
+        <div id="modalSummary" style="text-align: left; background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; font-family: sans-serif; line-height: 1.6; border-left: 5px solid #ffc107;"></div>
+        <p style="font-weight: bold; color: #555;">If correct, confirm to submit to your supervisor.</p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button id="finalConfirmBtn" onclick="executeSubmit()" style="background: #28a745; width: auto; padding: 12px 25px;">Confirm & Send</button>
+            <button onclick="document.getElementById('successModal').classList.add('hidden')" style="background: #6c757d; width: auto; padding: 12px 25px;">Edit Form</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let token = null;
+let pendingPayload = null;
+
+document.getElementById('pin').addEventListener('input', function() {
+    this.value = this.value.replace(/[^0-9]/g, '');
+});
+
+function updateButtonColor() {
+    const shift = document.getElementById("shiftSelect").value;
+    const btn = document.getElementById("submitBtn");
+    if (!btn) return;
+    if (shift === "dayshift") { btn.style.background = "#ffc107"; btn.style.color = "black"; }
+    else if (shift === "evenings") { btn.style.background = "#007bff"; btn.style.color = "white"; }
+    else { btn.style.background = "#343a40"; btn.style.color = "white"; }
+}
+
+function autoGrow(el) {
+    el.style.height = "5px";
+    el.style.height = (el.scrollHeight) + "px";
+}
+
+function setupDatePicker(hiddenId, textareaId) {
+    const hiddenInput = document.querySelector(hiddenId);
+    const textArea = document.querySelector(textareaId);
+    if(!hiddenInput || !textArea) return;
+    const fp = flatpickr(hiddenInput, {
+        mode: "multiple", dateFormat: "m-d-y", conjunction: ", ",
+        onChange: (dates, str) => { textArea.value = str; autoGrow(textArea); }
+    });
+    textArea.addEventListener("click", () => fp.open());
+}
+
+const canvas = document.getElementById("sig");
+const pad = new SignaturePad(canvas);
+let lastWidth = window.innerWidth;
+
+function resizeCanvas() {
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const currentWidth = window.innerWidth;
+    if (currentWidth !== lastWidth || pad.isEmpty()) {
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext("2d").scale(ratio, ratio);
+        pad.clear();
+        lastWidth = currentWidth;
+    }
+}
+window.addEventListener("resize", resizeCanvas);
+
+function login() {
+    const userVal = document.getElementById("username").value.trim();
+    const passVal = document.getElementById("password").value.trim();
+    if (!userVal || !passVal) return alert("Login fields cannot be blank.");
+
+    token = "bypass-token";
+    document.getElementById("loginScreen").classList.add("hidden");
+    document.getElementById("formScreen").classList.remove("hidden");
+    setupDatePicker("#annHid", "#annualDates");
+    setupDatePicker("#sicHid", "#sickDates");
+    setupDatePicker("#perHid", "#personalDates");
+    setupDatePicker("#comHid", "#compDates");
+    setupDatePicker("#othHid", "#otherDates");
+    setTimeout(resizeCanvas, 100);
+    updateButtonColor();
+}
+
+function toggleMedicalNote() {
+    const hours = document.getElementById("sickHours").value;
+    const container = document.getElementById("medicalNoteContainer");
+    if (hours > 0) {
+        container.classList.remove("hidden");
+    } else {
+        container.classList.add("hidden");
+        document.getElementById("sickNote").value = ""; 
+    }
+}
+
+async function submitForm() {
+    const name = document.getElementById("employeeName").value;
+    const pin = document.getElementById("pin").value;
+    const remarks = document.getElementById("remarks").value.trim();
+    const shiftSelect = document.getElementById("shiftSelect");
+    const shiftValue = shiftSelect.value;
+    const shiftText = shiftSelect.options[shiftSelect.selectedIndex].text;
+    const errors = [];
+
+    if (!name) errors.push("Employee Name is required.");
+    if (!pin || pin.length !== 4) errors.push("A valid 4-digit numeric PIN is required.");
+    if (pad.isEmpty()) errors.push("A signature is required.");
+
+    const rows = [
+        { label: "Annual Leave", hrs: "annualHours", dates: "annualDates" },
+        { label: "Sick Leave", hrs: "sickHours", dates: "sickDates" },
+        { label: "Personal Leave", hrs: "personalHours", dates: "personalDates" },
+        { label: "Compensatory", hrs: "compHours", dates: "compDates" },
+        { label: "Other", hrs: "otherHours", dates: "otherDates" }
+    ];
+
+    let filledItems = [];
+    let hasOneFullRow = false;
+    let otherUsed = false;
+
+    rows.forEach(row => {
+        const hVal = document.getElementById(row.hrs).value;
+        const dVal = document.getElementById(row.dates).value;
+        if ((hVal && !dVal) || (!hVal && dVal)) errors.push(`${row.label}: Provide both dates AND hours.`);
+        if (hVal && dVal) {
+            filledItems.push({ label: row.label, hrs: hVal, dates: dVal });
+            hasOneFullRow = true;
+            if (row.label === "Other") otherUsed = true;
+        }
+    });
+
+    if (otherUsed && !remarks) errors.push("Remarks are required when 'Other' leave is selected.");
+    if (!hasOneFullRow && errors.length === 0) errors.push("Please fill out at least one leave type row.");
+
+    if (errors.length > 0) return alert("Please fix:\n\n• " + errors.join("\n• "));
+
+    const fileInput = document.getElementById("sickNote");
+    let fileBase64 = null;
+    let fileName = null;
+
+    if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        fileName = file.name;
+        fileBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    pendingPayload = {
+        employeeName: name, pin, shift: shiftValue,
+        annualDates: document.getElementById("annualDates").value,
+        annualHours: document.getElementById("annualHours").value,
+        sickDates: document.getElementById("sickDates").value,
+        sickHours: document.getElementById("sickHours").value,
+        personalDates: document.getElementById("personalDates").value,
+        personalHours: document.getElementById("personalHours").value,
+        compDates: document.getElementById("compDates").value,
+        compHours: document.getElementById("compHours").value,
+        otherDates: document.getElementById("otherDates").value,
+        otherHours: document.getElementById("otherHours").value,
+        remarks: document.getElementById("remarks").value,
+        signature: pad.toDataURL("image/png"),
+        medicalNote: fileBase64,
+        medicalNoteName: fileName
+    };
+
+    let summaryHtml = `<strong>${name}</strong>, your request for:<br><br>`;
+    filledItems.forEach(item => { summaryHtml += `• <strong>${item.hrs} hrs</strong> of <strong>${item.label}</strong> on ${item.dates}<br>`; });
+    if (fileBase64) summaryHtml += `<br>📎 <em>Note attached: ${fileName}</em>`;
+    summaryHtml += `<br><br>Will be submitted to the <strong>${shiftText} Supervisors</strong>.`;
+
+    const finalBtn = document.getElementById("finalConfirmBtn");
+    if (shiftValue === "dayshift") { finalBtn.style.background = "#ffc107"; finalBtn.style.color = "black"; }
+    else if (shiftValue === "evenings") { finalBtn.style.background = "#007bff"; finalBtn.style.color = "white"; }
+    else { finalBtn.style.background = "#343a40"; finalBtn.style.color = "white"; }
+
+    document.getElementById("modalSummary").innerHTML = summaryHtml;
+    document.getElementById("successModal").classList.remove("hidden");
+}
+
+async function executeSubmit() {
+    const btn = document.getElementById("finalConfirmBtn");
+    btn.disabled = true;
+    btn.innerText = "Sending...";
+    try {
+        const res = await fetch("/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": token },
+            body: JSON.stringify(pendingPayload)
+        });
+        if (!res.ok) throw new Error(await res.text());
+        document.getElementById("successModal").innerHTML = `
+            <div style="background: white; padding: 30px; border-radius: 15px; max-width: 450px; width: 90%; text-align: center;">
+                <div style="color: #28a745; font-size: 60px;">✔</div>
+                <h2>Sent Successfully!</h2>
+                <p>Your request has been delivered.</p>
+                <button onclick="location.reload()" style="background: #007bff; color:white; padding: 10px 20px; border:none; border-radius:5px; cursor:pointer;">Finish</button>
+            </div>`;
+    } catch (err) {
+        alert("Submission Failed: " + err.message);
+        btn.disabled = false;
+        btn.innerText = "Confirm & Send";
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById("username").value = "Port";
+    document.getElementById("password").value = "Leave Request";
+});
+</script>
+</body>
+</html>
