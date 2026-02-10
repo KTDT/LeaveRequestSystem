@@ -14,7 +14,9 @@ const USERS = [{ username: "Test", password: "1111", role: "Employee" }];
 
 // EMAIL CONFIGURATION
 const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true, // Use SSL
     auth: {
         type: "OAuth2",
         user: process.env.GMAIL_USER,
@@ -22,7 +24,9 @@ const transporter = nodemailer.createTransport({
         clientSecret: process.env.GMAIL_CLIENT_SECRET,
         refreshToken: process.env.GMAIL_REFRESH_TOKEN
     },
-    tls: { rejectUnauthorized: false }
+    tls: {
+        rejectUnauthorized: false
+    }
 });
 
 app.post("/submit", async (req, res) => {
@@ -138,4 +142,5 @@ const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
     console.log(`Server is running on port ${port}`);
 });
+
 
