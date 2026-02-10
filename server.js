@@ -6,6 +6,7 @@ const { PDFDocument, degrees } = require("pdf-lib");
 
 const app = express();
 app.use(express.json({ limit: "20mb" })); // Increased limit for photo attachments
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(express.static("public"));
 
 const SECRET = "123456";
@@ -137,3 +138,4 @@ const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
     console.log(`Server is running on port ${port}`);
 });
+
