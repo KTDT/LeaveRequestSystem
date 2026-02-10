@@ -14,16 +14,18 @@ const USERS = [{ username: "Test", password: "1111", role: "Employee" }];
 
 // EMAIL CONFIGURATION
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // Must be false for Port 587
+    host: "smtp.office365.com",
+    port: 2525, // Change from 587 to 2525
+    secure: false,
     auth: {
-        type: "OAuth2",
-        user: process.env.GMAIL_USER,
-        clientId: process.env.GMAIL_CLIENT_ID,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     },
+    tls: {
+        ciphers: 'SSLv3',
+        rejectUnauthorized: false
+    }
+});
     tls: {
         rejectUnauthorized: false, // Keeps connection from dropping due to cert issues
         minVersion: 'TLSv1.2'      // Ensures modern security
@@ -143,6 +145,7 @@ const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
     console.log(`Server is running on port ${port}`);
 });
+
 
 
 
